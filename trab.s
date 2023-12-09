@@ -42,7 +42,8 @@
 	teste4: .string "Tesfl4"
 	teste5: .string "Tesfl5"
 	teste6: .string "Tesfl6"
-	parametros: .string "%s%s%s%s%s%s"
+	teste7: .quad 888
+	parametros: .string "%s%s%s%s%s%s%s%ld"
 # .section .bss
 # .lcomm line, STRLEN_LINE
 
@@ -176,12 +177,12 @@ fprintf:
 				jmp fprintf_fim_regs
 
 			fprintf_pilha:
-				subq $4, %r11
+				subq $2, %r11
 				movq (%rbp, %r11, 8), %r12
-				addq $4, %r11
+				addq $2, %r11
 
 			fprintf_fim_regs:
-
+# %s /////////////////////////////////////////////////////////////////////////////// 
 			# salta para rotulo especifico para tratar esse caractere %s
 			cmpb $LETTER_S, %bl
 			jne rotulo_ld
@@ -223,15 +224,50 @@ fprintf:
 
 			jmp rotulo_fim_switch
 
-			# %ld
+# %ld /////////////////////////////////////////////////////////////////////////////// 
 			rotulo_ld:
 			cmpb $LETTER_L, %bl
 			jne rotulo_c
 			incq %rax # vai para o 'd' do 'ld' (possivelmente há tratamento de erro para %l)
-			# call
+			
+			pushq %rax
+			pushq %rdi
+			pushq %rsi
+			pushq %rdx
+			pushq %rcx
+			pushq %r8
+			pushq %r9
+			pushq %r11
+
+			movq $8, %rdx
+
+			# contar tamanho da string
+			# fprintf_condicao_2:
+			# 	movb (%r12, %rdx, 1), %al
+			# 	cmpb $END_OF_STRING, %al # Checa se terminou a string
+			# 	je fprintf_fim_while_2
+			# 	incq %rdx
+			# 	jmp fprintf_condicao_2
+			# fprintf_fim_while_2:
+			
+			movq $SYS_write, %rax		# system code for write()
+			# movq $STDOUT, %rdi		# standard output [%rdi já possui o endereço do arquivo]
+			movq %r12, %rsi  			# string address
+			# movq $STRLEN_OUPUT, %rdx	# length value [%rdx já possui a 'length']
+			syscall
+
+			popq %r11
+			popq %r9
+			popq %r8
+			popq %rcx
+			popq %rdx
+			popq %rsi
+			popq %rdi
+			popq %rax
+
 			jmp rotulo_fim_switch
 
-			# %c
+# %c /////////////////////////////////////////////////////////////////////////////// 
 			rotulo_c:
 			cmpb $LETTER_C, %bl
 			jne rotulo_fim_switch
@@ -261,7 +297,7 @@ movq %rsp, %rbp
 
 call fopen_SB
 # call fclose_SB
-subq $16, %rsp
+subq $32, %rsp
 
 movq %rax, %rdi
 leaq parametros(%rip), %rsi
@@ -272,16 +308,23 @@ leaq teste2(%rip), %r8
 leaq teste3(%rip), %r9
 movq $teste4, -8(%rbp)
 movq $teste5, -16(%rbp)
-# movq $teste6, -24(%rbp)
+movq $teste6, -24(%rbp)
+movq teste7, %rbx
+movq %rbx, -32(%rbp)
 
-pushq -8(%rbp)
+# empilhar ao contrario os parametros da pilha
+pushq -32(%rbp)
+pushq -24(%rbp)
 pushq -16(%rbp)
+pushq -8(%rbp)
 
 call fprintf
 movq %rax, %rdi
 
-popq -16(%rbp)
 popq -8(%rbp)
+popq -16(%rbp)
+popq -24(%rbp)
+popq -32(%rbp)
 
 addq $16, %rsp
 popq %rbp
