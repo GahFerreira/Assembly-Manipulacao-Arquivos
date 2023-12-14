@@ -27,15 +27,17 @@
 
 .equ END_OF_STRING, 0
 .equ PERCENT, 37
-.equ LETTER_S, 115
-.equ LETTER_L, 108
-.equ LETTER_D, 100
-.equ LETTER_C, 99
+.equ LETTER_s, 115
+.equ LETTER_l, 108
+.equ LETTER_d, 100
+.equ LETTER_c, 99
 
 .section .data
 	# enterMsgString: .string "Enter a String: "
 	parametrofopen: .string "w" # parametros implementados = w+(leitura e escrita), w(somente escrita), r(somente leitura)
-	output_file: .string "output.txt"
+	parametrosfscanf: .string "%s"
+	parametrosfprintf: .string "FUNCIONA:%sSera?%sMesmo?%s %s funciona %s sim %s HA%s H A %ld H A A %c HA A A A %c \naÇaí %c é mUITO %c BOM \n%ld\n KKK"
+	output_file: .string "output.txt" # arquivo de saida 
 	teste0: .string "Tesfl0"
 	teste1: .string "Tesfl1"
 	teste2: .string "Tesfl2"
@@ -49,7 +51,6 @@
 	teste9char: .byte '*'
 	teste10char: .byte '*'
 	teste11char: .byte '*'
-	parametros: .string "FUNCIONA:%sSera?%sMesmo?%s %s funciona %s sim %s HA%s H A %ld H A A %c HA A A A %c aÇaí %c é mUITO %c BOM %ld KKK"
 # .section .bss
 # .lcomm line, STRLEN_LINE
 
@@ -170,8 +171,8 @@ popq %rbp
 ret
 
 fopen_SB:
-	pushq %rbp
-	movq %rsp, %rbp
+pushq %rbp
+movq %rsp, %rbp
 
 	movq $0, %r13
 	movb (%rdi, %r13,1), %al
@@ -289,7 +290,7 @@ fprintf:
 # %s /////////////////////////////////////////////////////////////////////////////// 
 			rotulo_s:
 			# salta para rotulo especifico para tratar esse caractere %s
-			cmpb $LETTER_S, %bl
+			cmpb $LETTER_s, %bl
 			jne rotulo_ld
 
 			pushq %rax
@@ -331,7 +332,7 @@ fprintf:
 
 # %ld /////////////////////////////////////////////////////////////////////////////// 
 			rotulo_ld:
-			cmpb $LETTER_L, %bl
+			cmpb $LETTER_l, %bl
 			jne rotulo_c
 			incq %rax # vai para o 'd' do 'ld' (possivelmente há tratamento de erro para %l)
 			
@@ -384,7 +385,7 @@ fprintf:
 			jmp rotulo_fim_switch
 # %c /////////////////////////////////////////////////////////////////////////////// 
 			rotulo_c:
-			cmpb $LETTER_C, %bl
+			cmpb $LETTER_c, %bl
 			jne rotulo_fim_switch
 
 			pushq %rax
@@ -456,8 +457,27 @@ fprintf:
 		jmp fprintf_condicao_1
 	fprintf_fim_while_1:
 	
-	popq %rbp
-	ret
+popq %rbp
+ret
+
+fscanf:
+pushq %rbp
+movq %rsp, %rbp
+
+
+	rotulo_fscanf_s:
+	movq %rax, %r8
+	movq $SYS_read, %rax		# system code for write()
+	# movq $STDOUT, %rdi		# standard output [%rdi já possui o endereço do arquivo]
+	leaq (%rsi, %r8, 1), %rsi	# string address[ja em %rsi]
+	movq $1, %rdx				# length size
+	syscall
+	
+	fim_rotulo_fscanf_s:
+
+
+popq %rbp
+ret 
 
 _start:
 pushq %rbp
@@ -465,10 +485,10 @@ movq %rsp, %rbp
 
 movq $parametrofopen, %rdi
 call fopen_SB
+movq %rax, %rdi # move o ponteiro do arquivo para rdi
 
-movq %rax, %rdi
 # parametros("%s%s%s%s%s%s%s%ld%c%c%c%c%ld"):
-leaq parametros(%rip), %rsi
+leaq parametrosfprintf(%rip), %rsi
 
 subq $72, %rsp
 # variaveis(necessario estar em ordem com os parametros):
@@ -516,7 +536,12 @@ pushq -16(%rbp)
 pushq -8(%rbp)
 
 call fprintf
-movq %rax, %rdi
+# movq %rax, %rdi
+
+leaq parametrosfscanf(%rip), %rsi
+call fscanf
+
+
 
 popq -8(%rbp)
 popq -16(%rbp)
