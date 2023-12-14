@@ -42,7 +42,7 @@
 	teste4: .string "Tesfl4"
 	teste5: .string "Tesfl5"
 	teste6: .string "Tesfl6"
-	teste7: .quad 888
+	teste7inteiro: .quad -00000000
 	parametros: .string "%s%s%s%s%s%s%s%ld"
 # .section .bss
 # .lcomm line, STRLEN_LINE
@@ -87,6 +87,70 @@
 
 # popq 	%rbp
 # ret
+converter_inteiro_em_string:
+pushq %rbp
+movq %rsp, %rbp
+leaq 16(%rbp), %r12  # acessa endereço da string
+
+# move o valor inteiro pra rax
+movq %rdi, %rax
+movq $10, %rbx
+
+cmpq $0, %rax		# se for negativo torna positivo para evitar erros
+jge proximo_digito
+negq %rax
+
+	proximo_digito:
+		movq $0, %rdx
+		divq %rbx
+		addb $48, %dl
+		decq %rsi
+		movb %dl, (%r12, %rsi, 1)
+		cmpq $0,%rax
+		jne proximo_digito
+
+	movq $0, %rdx
+	movb $0, %dl
+
+	cmpq $0, %rdi 	# caso numero negativo coloca sinal negativo
+	jge nao_necessario_adicionar_negativo
+	addb $45, %dl
+	decq %rsi
+	movb %dl, (%r12, %rsi, 1)
+
+	nao_necessario_adicionar_negativo:
+
+popq %rbp
+ret
+
+checar_tamanho_inteiro:
+pushq %rbp
+movq %rsp, %rbp
+# move o valor inteiro pra rax
+movq %rdi, %rax
+# contador de digitos
+movq $1, %r15 # comeca com 1 pois adicionar byte do \0
+movq $10, %rbx
+
+	cmpq $0, %rax 	# caso numero negativo incrementa 1 no contador para sinal de negativo
+	jge menor_que_10
+	incq %r15
+	negq %rax
+
+	menor_que_10:
+	cmp $9, %rax
+	jle fim_if_conversao
+	incq %r15
+
+	divq %rbx
+	movq $0, %rdx
+	
+	jmp menor_que_10
+	fim_if_conversao:
+
+movq %r15, %rax
+popq %rbp
+ret
 
 fclose_SB:
 pushq %rbp
@@ -183,6 +247,7 @@ fprintf:
 
 			fprintf_fim_regs:
 # %s /////////////////////////////////////////////////////////////////////////////// 
+			rotulo_s:
 			# salta para rotulo especifico para tratar esse caractere %s
 			cmpb $LETTER_S, %bl
 			jne rotulo_ld
@@ -210,7 +275,7 @@ fprintf:
 			movq $SYS_write, %rax		# system code for write()
 			# movq $STDOUT, %rdi		# standard output [%rdi já possui o endereço do arquivo]
 			movq %r12, %rsi  			# string address
-			# movq $STRLEN_OUPUT, %rdx	# length value [%rdx já possui a 'length']
+			# movq $STRLEN_OUPUT, %rdx	# length size [%rdx já possui a 'length']
 			syscall
 
 			popq %r11
@@ -231,38 +296,49 @@ fprintf:
 			incq %rax # vai para o 'd' do 'ld' (possivelmente há tratamento de erro para %l)
 			
 			pushq %rax
-			pushq %rdi
-			pushq %rsi
 			pushq %rdx
 			pushq %rcx
 			pushq %r8
 			pushq %r9
 			pushq %r11
+			pushq %rsi
+			pushq %rdi
 
-			movq $8, %rdx
-
-			# contar tamanho da string
-			# fprintf_condicao_2:
-			# 	movb (%r12, %rdx, 1), %al
-			# 	cmpb $END_OF_STRING, %al # Checa se terminou a string
-			# 	je fprintf_fim_while_2
-			# 	incq %rdx
-			# 	jmp fprintf_condicao_2
-			# fprintf_fim_while_2:
+			movq $0, %rdx
 			
+			movq %r12,%rdi
+			call checar_tamanho_inteiro
+			movq %rax, %r14
+
+			# parametros para a funcao converter inteiro
+			movq %r12, %rdi # numero inteiro a ser transformado
+			movq %r14, %rsi	# tamanho do numero inteiro
+
+			subq $24, %rsp  # memoria alocada p/ endereço da string(numero maximo de digitos de um inteiro e 20 + \0, porem deve ser multiplo de 8 o valor)
+			call converter_inteiro_em_string
+			addq $24, %rsp # desloca o ponteiro para conseguir desempilhar os parametros
+
+			popq %rdi
+			popq %rsi
+			
+			# após salvar os registradores antes do syscall
+			pushq %rsi
+			pushq %rdi
+			subq $24, %rsp # direciona o ponteiro novamente após salvar os registradores antes do syscall
 			movq $SYS_write, %rax		# system code for write()
 			# movq $STDOUT, %rdi		# standard output [%rdi já possui o endereço do arquivo]
-			movq %r12, %rsi  			# string address
-			# movq $STRLEN_OUPUT, %rdx	# length value [%rdx já possui a 'length']
+			leaq -88(%rbp), %rsi  		# Endereco da string na pilha(Topo da pilha possuiu o algarismo mais significativo)
+			movq %r14, %rdx	            # length size
+			addq $24, %rsp # desloca o ponteiro novamente antes do syscall(pois da B.O se for depois :0)
 			syscall
 
+			popq %rdi
+			popq %rsi
 			popq %r11
 			popq %r9
 			popq %r8
 			popq %rcx
 			popq %rdx
-			popq %rsi
-			popq %rdi
 			popq %rax
 
 			jmp rotulo_fim_switch
@@ -286,7 +362,7 @@ fprintf:
 		jmp fprintf_condicao_1
 	fprintf_fim_while_1:
 	
-	# movq %r11, %rax
+	# movq %r14, %rax
 
 	popq %rbp
 	ret
@@ -309,7 +385,7 @@ leaq teste3(%rip), %r9
 movq $teste4, -8(%rbp)
 movq $teste5, -16(%rbp)
 movq $teste6, -24(%rbp)
-movq teste7, %rbx
+movq teste7inteiro, %rbx
 movq %rbx, -32(%rbp)
 
 # empilhar ao contrario os parametros da pilha
@@ -326,7 +402,7 @@ popq -16(%rbp)
 popq -24(%rbp)
 popq -32(%rbp)
 
-addq $16, %rsp
+addq $32, %rsp
 popq %rbp
 
 # fprintf(ARQUIVO, "%s%s%s%s%s%s", a, b, c, d, e, f);
@@ -337,5 +413,4 @@ popq %rbp
 # pilha = e, f
 
 movq $SYS_exit, %rax
-movq $60, %rax
 syscall
