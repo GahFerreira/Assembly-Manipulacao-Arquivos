@@ -43,11 +43,12 @@
 	teste5: .string "Tesfl5"
 	teste6: .string "Tesfl6"
 	teste7inteiro: .quad -00000000
-	teste8char: .byte 'q'
-	teste9char: .byte 'u'
-	teste10char: .byte 'a'
-	teste11char: .byte 'd'
-	parametros: .string "%s%s%s%s%s%s%s%ld%c%c%c%c"
+	teste8inteiro: .quad 999
+	teste8char: .byte '*'
+	teste9char: .byte '*'
+	teste10char: .byte '*'
+	teste11char: .byte '*'
+	parametros: .string "FUNCIONA:%sSera?%sMesmo?%s %s funciona %s sim %s HA%s H A %ld H A A %c HA A A A %c SOU %c MUITO %c BOM %ld KKK"
 # .section .bss
 # .lcomm line, STRLEN_LINE
 
@@ -348,6 +349,9 @@ fprintf:
 			jmp rotulo_fim_switch
 # %c /////////////////////////////////////////////////////////////////////////////// 
 			rotulo_c:
+			cmpb $LETTER_C, %bl
+			jne rotulo_fim_switch
+
 			pushq %rax
 			pushq %rdi
 			pushq %rsi
@@ -357,10 +361,9 @@ fprintf:
 			pushq %r9
 			pushq %r11
 
-			movq $1, %rdx
+			movq $0, %rdx
 
-			cmpb $LETTER_C, %bl
-			jne rotulo_fim_switch
+
 			movb (%r12, %rdx, 1), %al
 			# call
 			movq $SYS_write, %rax		# system code for write()
@@ -378,15 +381,43 @@ fprintf:
 			popq %rdi
 			popq %rax
 
-# fim escolhas ///////////////////////////////////////////////////////
+			jmp rotulo_fim_switch
+# fim escolhas para % ///////////////////////////////////////////////////
 			rotulo_fim_switch:
 			incq %r11
-
+			incq %rax
+			jmp fprintf_condicao_1
 		fim_if_1:
 
-	# se nao for porcentagem
-	# imprime o caractere na saida
-	# incrementa posicao atual
+	# se nao for porcentagem imprime o caractere na saida
+		pushq %rax
+		pushq %rdi
+		pushq %rsi
+		pushq %rdx
+		pushq %rcx
+		pushq %r8
+		pushq %r9
+		pushq %r11
+		
+		movq %rax, %r8
+		# movb (%r12, %rdx, 1), %al
+		# call
+		movq $SYS_write, %rax		# system code for write()
+		# movq $STDOUT, %rdi		# standard output [%rdi já possui o endereço do arquivo]
+		leaq (%rsi, %r8, 1), %rsi			# string address[ja em %rsi]
+		movq $1, %rdx	# length size
+		syscall
+
+		popq %r11
+		popq %r9
+		popq %r8
+		popq %rcx
+		popq %rdx
+		popq %rsi
+		popq %rdi
+		popq %rax
+
+		# incrementa posicao atual
 		incq %rax
 
 		jmp fprintf_condicao_1
@@ -403,11 +434,13 @@ movq %rsp, %rbp
 
 call fopen_SB
 # call fclose_SB
-subq $64, %rsp
+subq $72, %rsp
 
 movq %rax, %rdi
+# parametros("%s%s%s%s%s%s%s%ld%c%c%c%c%ld"):
 leaq parametros(%rip), %rsi
 
+# variaveis(necessario estar em ordem com os parametros):
 leaq teste0(%rip), %rdx
 leaq teste1(%rip), %rcx
 leaq teste2(%rip), %r8
@@ -421,9 +454,27 @@ movq $teste8char, -40(%rbp)
 movq $teste9char, -48(%rbp)
 movq $teste10char, -56(%rbp)
 movq $teste11char, -64(%rbp)
+movq teste8inteiro, %rbx
+movq %rbx, -72(%rbp)
+
+# segundo teste (ordem dos parametros = %c%s%ld%c%s%c%s%s%s%s%s%ld%c)
+# leaq teste8char(%rip),%rdx
+# leaq teste0(%rip), %rcx
+# movq teste7inteiro, %r8
+# leaq teste9char(%rip), %r9
+# movq $teste1, -8(%rbp)
+# movq $teste10char, -16(%rbp)
+# movq $teste2, -24(%rbp)
+# movq $teste3, -32(%rbp)
+# movq $teste4, -40(%rbp)
+# movq $teste5, -48(%rbp)
+# movq $teste6, -56(%rbp)
+# movq teste8inteiro, %rbx
+# movq %rbx, -64(%rbp)
+# movq $teste11char, -72(%rbp)
 
 # empilhar ao contrario os parametros da pilha
-
+pushq -72(%rbp)
 pushq -64(%rbp)
 pushq -56(%rbp)
 pushq -48(%rbp)
@@ -444,8 +495,9 @@ popq -40(%rbp)
 popq -48(%rbp)
 popq -56(%rbp)
 popq -64(%rbp)
+pushq -72(%rbp)
 
-addq $64, %rsp
+addq $72, %rsp
 popq %rbp
 
 # fprintf(ARQUIVO, "%s%s%s%s%s%s", a, b, c, d, e, f);
