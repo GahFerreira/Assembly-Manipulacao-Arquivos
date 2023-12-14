@@ -43,7 +43,11 @@
 	teste5: .string "Tesfl5"
 	teste6: .string "Tesfl6"
 	teste7inteiro: .quad -00000000
-	parametros: .string "%s%s%s%s%s%s%s%ld"
+	teste8char: .byte 'q'
+	teste9char: .byte 'u'
+	teste10char: .byte 'a'
+	teste11char: .byte 'd'
+	parametros: .string "%s%s%s%s%s%s%s%ld%c%c%c%c"
 # .section .bss
 # .lcomm line, STRLEN_LINE
 
@@ -342,13 +346,39 @@ fprintf:
 			popq %rax
 
 			jmp rotulo_fim_switch
-
 # %c /////////////////////////////////////////////////////////////////////////////// 
 			rotulo_c:
+			pushq %rax
+			pushq %rdi
+			pushq %rsi
+			pushq %rdx
+			pushq %rcx
+			pushq %r8
+			pushq %r9
+			pushq %r11
+
+			movq $1, %rdx
+
 			cmpb $LETTER_C, %bl
 			jne rotulo_fim_switch
+			movb (%r12, %rdx, 1), %al
 			# call
-			
+			movq $SYS_write, %rax		# system code for write()
+			# movq $STDOUT, %rdi		# standard output [%rdi já possui o endereço do arquivo]
+			movq %r12, %rsi  			# string address
+			movq $1, %rdx	# length size
+			syscall
+
+			popq %r11
+			popq %r9
+			popq %r8
+			popq %rcx
+			popq %rdx
+			popq %rsi
+			popq %rdi
+			popq %rax
+
+# fim escolhas ///////////////////////////////////////////////////////
 			rotulo_fim_switch:
 			incq %r11
 
@@ -373,7 +403,7 @@ movq %rsp, %rbp
 
 call fopen_SB
 # call fclose_SB
-subq $32, %rsp
+subq $64, %rsp
 
 movq %rax, %rdi
 leaq parametros(%rip), %rsi
@@ -387,8 +417,17 @@ movq $teste5, -16(%rbp)
 movq $teste6, -24(%rbp)
 movq teste7inteiro, %rbx
 movq %rbx, -32(%rbp)
+movq $teste8char, -40(%rbp)
+movq $teste9char, -48(%rbp)
+movq $teste10char, -56(%rbp)
+movq $teste11char, -64(%rbp)
 
 # empilhar ao contrario os parametros da pilha
+
+pushq -64(%rbp)
+pushq -56(%rbp)
+pushq -48(%rbp)
+pushq -40(%rbp)
 pushq -32(%rbp)
 pushq -24(%rbp)
 pushq -16(%rbp)
@@ -401,8 +440,12 @@ popq -8(%rbp)
 popq -16(%rbp)
 popq -24(%rbp)
 popq -32(%rbp)
+popq -40(%rbp)
+popq -48(%rbp)
+popq -56(%rbp)
+popq -64(%rbp)
 
-addq $32, %rsp
+addq $64, %rsp
 popq %rbp
 
 # fprintf(ARQUIVO, "%s%s%s%s%s%s", a, b, c, d, e, f);
