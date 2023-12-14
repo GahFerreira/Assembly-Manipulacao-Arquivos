@@ -34,7 +34,8 @@
 
 .section .data
 	# enterMsgString: .string "Enter a String: "
-	input_file: 	.string "input.txt"
+	parametrofopen: .string "w" # parametros implementados = w+(leitura e escrita), w(somente escrita), r(somente leitura)
+	output_file: .string "output.txt"
 	teste0: .string "Tesfl0"
 	teste1: .string "Tesfl1"
 	teste2: .string "Tesfl2"
@@ -48,7 +49,7 @@
 	teste9char: .byte '*'
 	teste10char: .byte '*'
 	teste11char: .byte '*'
-	parametros: .string "FUNCIONA:%sSera?%sMesmo?%s %s funciona %s sim %s HA%s H A %ld H A A %c HA A A A %c SOU %c MUITO %c BOM %ld KKK"
+	parametros: .string "FUNCIONA:%sSera?%sMesmo?%s %s funciona %s sim %s HA%s H A %ld H A A %c HA A A A %c aÇaí %c é mUITO %c BOM %ld KKK"
 # .section .bss
 # .lcomm line, STRLEN_LINE
 
@@ -78,7 +79,7 @@
 # syscall
 
 # movq 	$SYS_open, %rax 	# file open/create
-# movq 	$input_file, %rdi
+# movq 	$output_file, %rdi
 # movq 	$O_CREAT, %rsi
 # orq 	$O_WDONLY, %rsi		# write
 # movq	$S_MODE, %rdx
@@ -95,35 +96,35 @@
 converter_inteiro_em_string:
 pushq %rbp
 movq %rsp, %rbp
-leaq 16(%rbp), %r12  # acessa endereço da string
+	leaq 16(%rbp), %r12  # acessa endereço da string
 
-# move o valor inteiro pra rax
-movq %rdi, %rax
-movq $10, %rbx
+	# move o valor inteiro pra rax
+	movq %rdi, %rax
+	movq $10, %rbx
 
-cmpq $0, %rax		# se for negativo torna positivo para evitar erros
-jge proximo_digito
-negq %rax
+	cmpq $0, %rax		# se for negativo torna positivo para evitar erros
+	jge proximo_digito
+	negq %rax
 
-	proximo_digito:
+		proximo_digito:
+			movq $0, %rdx
+			divq %rbx
+			addb $48, %dl
+			decq %rsi
+			movb %dl, (%r12, %rsi, 1)
+			cmpq $0,%rax
+			jne proximo_digito
+
 		movq $0, %rdx
-		divq %rbx
-		addb $48, %dl
+		movb $0, %dl
+
+		cmpq $0, %rdi 	# caso numero negativo coloca sinal negativo
+		jge nao_necessario_adicionar_negativo
+		addb $45, %dl
 		decq %rsi
 		movb %dl, (%r12, %rsi, 1)
-		cmpq $0,%rax
-		jne proximo_digito
 
-	movq $0, %rdx
-	movb $0, %dl
-
-	cmpq $0, %rdi 	# caso numero negativo coloca sinal negativo
-	jge nao_necessario_adicionar_negativo
-	addb $45, %dl
-	decq %rsi
-	movb %dl, (%r12, %rsi, 1)
-
-	nao_necessario_adicionar_negativo:
+		nao_necessario_adicionar_negativo:
 
 popq %rbp
 ret
@@ -131,29 +132,29 @@ ret
 checar_tamanho_inteiro:
 pushq %rbp
 movq %rsp, %rbp
-# move o valor inteiro pra rax
-movq %rdi, %rax
-# contador de digitos
-movq $1, %r15 # comeca com 1 pois adicionar byte do \0
-movq $10, %rbx
+	# move o valor inteiro pra rax
+	movq %rdi, %rax
+	# contador de digitos
+	movq $1, %r15 # comeca com 1 pois adicionar byte do \0
+	movq $10, %rbx
 
-	cmpq $0, %rax 	# caso numero negativo incrementa 1 no contador para sinal de negativo
-	jge menor_que_10
-	incq %r15
-	negq %rax
+		cmpq $0, %rax 	# caso numero negativo incrementa 1 no contador para sinal de negativo
+		jge menor_que_10
+		incq %r15
+		negq %rax
 
-	menor_que_10:
-	cmp $9, %rax
-	jle fim_if_conversao
-	incq %r15
+		menor_que_10:
+		cmp $9, %rax
+		jle fim_if_conversao
+		incq %r15
 
-	divq %rbx
-	movq $0, %rdx
-	
-	jmp menor_que_10
-	fim_if_conversao:
+		divq %rbx
+		movq $0, %rdx
+		
+		jmp menor_que_10
+		fim_if_conversao:
 
-movq %r15, %rax
+	movq %r15, %rax
 popq %rbp
 ret
 
@@ -161,31 +162,65 @@ fclose_SB:
 pushq %rbp
 movq %rsp, %rbp
 
-movq $SYS_close, %rax
-movq %rdi, %rdi
-syscall
+	movq $SYS_close, %rax
+	movq %rdi, %rdi
+	syscall
 
 popq %rbp
 ret
 
 fopen_SB:
-pushq %rbp
-movq %rsp, %rbp
+	pushq %rbp
+	movq %rsp, %rbp
 
-# movq 	$SYS_open, %rax 	# file open/create
-# movq 	$input_file, %rdi
-# movq 	$O_CREAT, %rsi
-# orq 	$O_WDONLY, %rsi		# write
-# movq	$S_MODE, %rdx
-# syscall # return file descriptor in %rax
+	movq $0, %r13
+	movb (%rdi, %r13,1), %al
 
-movq 	$SYS_open, %rax 	# file open/create
-leaq 	input_file(%rip), %rdi
-movq 	$O_CREAT, %rsi
-orq 	$O_WDONLY, %rsi		# write
-movq	$S_MODE, %rdx
-syscall # return file descriptor in %rax
+	cmpb $114, %al # parametro = r(114)
+	jne parametro_wplus
 
+		# movq 	$SYS_open, %rax 	# file open/create
+		# leaq 	output_file(%rip), %rdi
+		movq 	$O_RDONLY, %rsi
+		# orq 	$O_WDONLY, %rsi		# write
+		movq	$S_MODE, %rdx
+		syscall # return file descriptor in %rax
+
+	jmp fim_fopen
+
+	parametro_wplus:
+	movq $1, %r13
+	movb (%rdi, %r13,1), %al
+
+	cmpb $43, %al	# parametro = +(43)(w+)
+	jne parametro_w
+
+		movq 	$SYS_open, %rax 	# file open/create
+		leaq 	output_file(%rip), %rdi
+		movq 	$O_CREAT, %rsi
+		orq 	$O_RDWR, %rsi		# write
+		movq	$S_MODE, %rdx
+		syscall # return file descriptor in %rax
+
+	jmp fim_fopen
+
+	parametro_w:
+	movq $0, %r13
+	movb (%rdi, %r13,1), %al
+
+	cmpb $119, %al	# parametro = w(119)
+	jne fim_fopen
+
+		movq 	$SYS_open, %rax 	# file open/create
+		leaq 	output_file(%rip), %rdi
+		movq 	$O_CREAT, %rsi
+		orq 	$O_WDONLY, %rsi		# write
+		movq	$S_MODE, %rdx
+		syscall # return file descriptor in %rax
+
+	jmp fim_fopen
+
+	fim_fopen:
 popq %rbp
 ret
 
@@ -363,9 +398,7 @@ fprintf:
 
 			movq $0, %rdx
 
-
 			movb (%r12, %rdx, 1), %al
-			# call
 			movq $SYS_write, %rax		# system code for write()
 			# movq $STDOUT, %rdi		# standard output [%rdi já possui o endereço do arquivo]
 			movq %r12, %rsi  			# string address
@@ -384,7 +417,9 @@ fprintf:
 			jmp rotulo_fim_switch
 # fim escolhas para % ///////////////////////////////////////////////////
 			rotulo_fim_switch:
+			# incrementa numero de porcentagens
 			incq %r11
+			# incrementa posicao atual
 			incq %rax
 			jmp fprintf_condicao_1
 		fim_if_1:
@@ -400,12 +435,10 @@ fprintf:
 		pushq %r11
 		
 		movq %rax, %r8
-		# movb (%r12, %rdx, 1), %al
-		# call
 		movq $SYS_write, %rax		# system code for write()
 		# movq $STDOUT, %rdi		# standard output [%rdi já possui o endereço do arquivo]
-		leaq (%rsi, %r8, 1), %rsi			# string address[ja em %rsi]
-		movq $1, %rdx	# length size
+		leaq (%rsi, %r8, 1), %rsi	# string address[ja em %rsi]
+		movq $1, %rdx				# length size
 		syscall
 
 		popq %r11
@@ -423,8 +456,6 @@ fprintf:
 		jmp fprintf_condicao_1
 	fprintf_fim_while_1:
 	
-	# movq %r14, %rax
-
 	popq %rbp
 	ret
 
@@ -432,14 +463,14 @@ _start:
 pushq %rbp
 movq %rsp, %rbp
 
+movq $parametrofopen, %rdi
 call fopen_SB
-# call fclose_SB
-subq $72, %rsp
 
 movq %rax, %rdi
 # parametros("%s%s%s%s%s%s%s%ld%c%c%c%c%ld"):
 leaq parametros(%rip), %rsi
 
+subq $72, %rsp
 # variaveis(necessario estar em ordem com os parametros):
 leaq teste0(%rip), %rdx
 leaq teste1(%rip), %rcx
@@ -500,12 +531,7 @@ pushq -72(%rbp)
 addq $72, %rsp
 popq %rbp
 
-# fprintf(ARQUIVO, "%s%s%s%s%s%s", a, b, c, d, e, f);
-
-# %rdi = ARQUIVO
-# %rsi = "%s%s%s%s%s%s"
-# %rdx, %rcx, %r8, %r9 = a, b, c, d,
-# pilha = e, f
+# call fclose_SB
 
 movq $SYS_exit, %rax
 syscall
